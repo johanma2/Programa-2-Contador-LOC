@@ -1,0 +1,111 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+class Program {
+    + {static} Main(args : string[]) : int
+}
+
+class ConsolaUI {
+    + PedirRuta() : string
+    + MostrarResultado(resultado : ResultadoPrograma) : void
+    + MostrarError(mensaje : string) : void
+}
+
+class LectorArchivos {
+    + ObtenerArchivos(ruta : string) : List<string>
+    + LeerContenido(rutaArchivo : string) : string
+    - BuscarArchivos(directorio : string, archivos : List<string>) : void
+    - TieneDirectorioExcluido(ruta : string) : bool
+    - {static} EsDirectorioExcluido(nombre : string) : bool
+    - {static} EsArchivoCSharp(ruta : string) : bool
+}
+
+class ContadorLOC {
+    + AnalizarInstrucciones(contenido : string) : List<UnidadLogica>
+    + ContarLOC(unidades : IEnumerable<UnidadLogica>) : int
+}
+
+enum "ContadorLOC::ContextoBloque" as ContextoBloque {
+    Archivo
+    Namespace
+    Clase
+    Enumeracion
+    Propiedad
+    BloqueCodigo
+    Lambda
+}
+
+class AnalizadorCodigo {
+    - _lectorArchivos : LectorArchivos
+    - _contadorLOC : ContadorLOC
+    + AnalizadorCodigo()
+    + Analizar(ruta : string) : ResultadoPrograma
+    + IdentificarPartes(unidades : IEnumerable<UnidadLogica>) : ResultadoPrograma
+}
+
+enum "AnalizadorCodigo::TipoBloque" as TipoBloque {
+    Parte
+    Enumeracion
+    Namespace
+    Otro
+}
+
+class UnidadLogica {
+    + Contenido : string
+    + Tipo : TipoUnidad
+    + NumeroLinea : int
+    + EsContabilizable : bool
+    + UnidadLogica(contenido : string, tipo : TipoUnidad, numeroLinea : int, esContabilizable : bool)
+}
+
+enum TipoUnidad {
+    DeclaracionNamespace
+    DeclaracionClase
+    DeclaracionEnumeracion
+    MiembroEnumeracion
+    DeclaracionMetodo
+    DeclaracionConstructor
+    DeclaracionMiembro
+    EstructuraControl
+    Instruccion
+    AperturaBloque
+    CierreBloque
+    Otro
+}
+
+class ResultadoPrograma {
+    - _partes : List<ResultadoParte>
+    + Partes : IReadOnlyList<ResultadoParte>
+    + LOCExternas : int
+    + TotalLOC : int
+    + CantidadArchivos : int
+    + ResultadoPrograma()
+    + AgregarParte(parte : ResultadoParte) : void
+    + AgregarLOCExternas(cantidad : int) : void
+    + RegistrarArchivo() : void
+    + IncorporarResultado(resultado : ResultadoPrograma) : void
+    + CalcularTotal() : int
+}
+
+class ResultadoParte {
+    + Nombre : string
+    + CantidadMetodos : int
+    + TotalLOC : int
+    + ResultadoParte(nombre : string)
+    + AgregarLOC() : void
+    + AgregarMetodo() : void
+}
+
+Program ..> ConsolaUI : usa
+Program ..> AnalizadorCodigo : usa
+ConsolaUI ..> ResultadoPrograma : presenta
+AnalizadorCodigo *-- LectorArchivos
+AnalizadorCodigo *-- ContadorLOC
+AnalizadorCodigo ..> ResultadoPrograma : construye
+AnalizadorCodigo ..> UnidadLogica : procesa
+AnalizadorCodigo +-- TipoBloque
+ContadorLOC ..> UnidadLogica : genera
+ContadorLOC +-- ContextoBloque
+UnidadLogica --> TipoUnidad : clasifica
+ResultadoPrograma o-- "0..*" ResultadoParte : contiene
+@enduml

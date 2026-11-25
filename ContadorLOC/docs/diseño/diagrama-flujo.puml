@@ -1,0 +1,52 @@
+@startuml
+start
+
+if (args.Length > 0?) then (sí)
+    :ruta = args[0];
+else (no)
+    :ruta = ConsolaUI.PedirRuta();
+endif
+
+:AnalizadorCodigo.Analizar(ruta);
+
+:LectorArchivos.ObtenerArchivos(ruta);
+if (Ruta vacía, inexistente, no .cs,\nsin archivos o dentro de bin/obj?) then (sí)
+    :Lanzar excepción controlada;
+    :ConsolaUI.MostrarError(mensaje);
+    :Retornar código 1;
+    stop
+endif
+
+:Crear ResultadoPrograma general;
+
+while (¿Quedan archivos .cs?) is (sí)
+    :contenido = LectorArchivos.LeerContenido(archivo);
+    :unidades = ContadorLOC.AnalizarInstrucciones(contenido)\n(comentarios, literales, contextos, lambdas, enums, propiedades);
+    if (¿Literal/comentario/bloque sin cerrar\no construcción excluida (#if, \"\"\", $$)?) then (sí)
+        :Lanzar FormatException / InvalidOperationException;
+        :ConsolaUI.MostrarError(mensaje);
+        :Retornar código 1;
+        stop
+    endif
+
+    :totalEsperado = ContadorLOC.ContarLOC(unidades);
+    :resultadoArchivo = AnalizadorCodigo.IdentificarPartes(unidades)\n(namespaces, clases anidadas, enums con 0 métodos, LOC externas);
+    :totalCalculado = resultadoArchivo.CalcularTotal();
+
+    if (totalEsperado != totalCalculado?) then (sí)
+        :Lanzar InvalidOperationException("Inconsistencia");
+        :ConsolaUI.MostrarError(mensaje);
+        :Retornar código 1;
+        stop
+    endif
+
+    :resultadoArchivo.RegistrarArchivo();
+    :resultadoGeneral.IncorporarResultado(resultadoArchivo);
+endwhile (no)
+
+:resultadoGeneral.CalcularTotal();
+:ConsolaUI.MostrarResultado(resultadoGeneral);
+:Retornar código 0;
+
+stop
+@enduml

@@ -37,9 +37,10 @@ Program no realizará directamente la búsqueda, lectura ni análisis de archivo
 - Ruta vacía o inexistente.
 - Extensión diferente de .cs.
 - Directorio sin archivos fuente.
+- Exclusión de rutas directas y subdirectorios `bin` y `obj`.
 - Errores de lectura y permisos.
 
-La búsqueda será recursiva y excluirá los directorios bin y obj en cualquier nivel.
+La búsqueda será recursiva y excluirá los directorios bin y obj en cualquier nivel, así como rutas directas que apunten a dichos directorios o a archivos contenidos en ellos.
 
 ### 2.3. ContadorLOC
 
@@ -162,7 +163,10 @@ La enumeración permitirá clasificar los elementos reconocidos.
 
 | Valor | Descripción |
 |---|---|
+| DeclaracionNamespace | Declaración de un espacio de nombres |
 | DeclaracionClase | Declaración de una clase |
+| DeclaracionEnumeracion | Declaración de una enumeración |
+| MiembroEnumeracion | Miembro de una enumeración |
 | DeclaracionMetodo | Declaración de un método |
 | DeclaracionConstructor | Declaración de un constructor |
 | DeclaracionMiembro | Declaración de campo o propiedad |

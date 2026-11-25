@@ -55,6 +55,10 @@ FUNCIÓN ObtenerArchivos(ruta)
         GENERAR error "No se indicó una ruta"
     FIN SI
 
+    SI ruta pertenece a directorio bin u obj
+        GENERAR error "No se analizan directorios bin ni obj"
+    FIN SI
+
     SI ruta corresponde a un archivo
 
         SI extensión no es .cs
@@ -156,121 +160,81 @@ FIN FUNCIÓN
 
 El análisis léxico se realiza una sola vez por archivo.
 
-## 5. Análisis léxico
+## 5. Análisis léxico y segmentación en una sola pasada
 
-### 5.1. Estados
+El algoritmo procesa el contenido fuente en una sola pasada carácter a carácter, conservando el texto original de los literales y los números de línea, sin crear una capa intermedia de tokens.
 
-| Estado | Responsabilidad |
+### 5.1. Contextos de bloque
+
+| Contexto | Responsabilidad |
 |---|---|
-| CODIGO | Reconocer instrucciones y delimitadores |
-| COMENTARIO_LINEA | Ignorar contenido hasta el salto de línea |
-| COMENTARIO_BLOQUE | Ignorar contenido hasta su cierre |
-| CADENA_NORMAL | Reconocer cadenas convencionales y escapes |
-| CADENA_TEXTUAL | Reconocer cadenas con prefijo @ |
-| CADENA_INTERPOLADA | Reconocer cadenas interpoladas admitidas |
-| CARACTER | Reconocer literales de carácter |
+| Archivo | Nivel superior fuera de espacios de nombres y partes |
+| Namespace | Cuerpo de un espacio de nombres con bloque |
+| Clase | Cuerpo directo de una clase (identifica métodos y constructores) |
+| Enumeracion | Cuerpo de una enumeración (separa miembros por coma o cierre) |
+| Propiedad | Cuerpo de una propiedad (omite accesores automáticos y encabezados) |
+| BloqueCodigo | Cuerpo de métodos, constructores, accesores y estructuras de control |
+| Lambda | Cuerpo de bloque de expresiones lambda (`=> { ... }`) |
 
 ### 5.2. Algoritmo
 
 ```text
 FUNCIÓN AnalizarInstrucciones(contenido)
 
-    estado ← CODIGO
-    posicion ← 0
+    contextos ← pila con [Archivo]
+    clases ← pila vacía
+    acumulador ← vacío
     linea ← 1
-    unidades ← colección vacía
-    unidadActual ← vacía
 
-    MIENTRAS posicion < longitud del contenido
-
-        caracter ← contenido[posicion]
+    PARA cada caracter EN contenido
 
         SI caracter es salto de línea
-            actualizar número de línea
+            linea ← linea + 1
         FIN SI
 
-        SEGÚN estado
+        SI inicia comentario // o /* ... */
+            omitir comentario conservando separación y saltos de línea
+            SI comentario de bloque sin cerrar → GENERAR error
 
-            CASO CODIGO:
+        SI NO, SI inicia directiva condicional (#if, #elif, #else, #endif) o comillas triples
+            GENERAR error de construcción no admitida
 
-                SI comienza comentario de línea
-                    estado ← COMENTARIO_LINEA
+        SI NO, SI inicia literal ($"...", @"...", "...", '...')
+            leer literal completo conservando su contenido original en acumulador
+            (en $"..." procesar huecos { ... } admitiendo literales internos)
+            SI literal sin cerrar → GENERAR error
 
-                SI NO, SI comienza comentario de bloque
-                    estado ← COMENTARIO_BLOQUE
+        SI NO, SI caracter es '{'
+            SI acumulador termina en "=>"
+                guardar estado externo y abrir bloque Lambda
+            SI NO, SI corresponde a inicializador (=, new fuera de where, o dentro de ()/[])
+                incrementar profundidad de inicializador y acumular
+            SI NO
+                emitir unidad acumulada y AperturaBloque
+                apilar nuevo contexto según tipo de unidad emitida
+            FIN SI
 
-                SI NO, SI comienza cadena interpolada admitida
-                    estado ← CADENA_INTERPOLADA
+        SI NO, SI caracter es '}'
+            SI existe inicializador activo
+                decrementar profundidad y acumular
+            SI NO
+                emitir remanente (ej. último miembro de enumeración)
+                desapilar contexto y emitir CierreBloque
+                SI cerró Lambda → restaurar acumulador externo
+                SI cerró Propiedad → verificar posible inicializador '= ...;'
+            FIN SI
 
-                SI NO, SI comienza cadena textual
-                    estado ← CADENA_TEXTUAL
+        SI NO
+            acumular caracter y actualizar profundidad de () y []
+            SI profundidad es cero
+                emitir por ',' en Enumeracion, por ';', por ')' de control,
+                por ':' de case/default o por palabra de control sin paréntesis
+            FIN SI
+        FIN SI
 
-                SI NO, SI comienza cadena convencional
-                    estado ← CADENA_NORMAL
+    FIN PARA
 
-                SI NO, SI comienza literal de carácter
-                    estado ← CARACTER
-
-                SI NO
-                    procesar caracter como código
-                    actualizar delimitadores y contexto
-                    reconocer unidades completas
-                FIN SI
-
-            CASO COMENTARIO_LINEA:
-
-                SI termina la línea
-                    estado ← CODIGO
-                FIN SI
-
-            CASO COMENTARIO_BLOQUE:
-
-                SI se reconoce el cierre */
-                    estado ← CODIGO
-                FIN SI
-
-            CASO CADENA_NORMAL:
-
-                reconocer caracteres de escape
-
-                SI se reconoce comilla de cierre válida
-                    estado ← CODIGO
-                FIN SI
-
-            CASO CADENA_TEXTUAL:
-
-                reconocer comillas dobles escapadas
-
-                SI se reconoce cierre válido
-                    estado ← CODIGO
-                FIN SI
-
-            CASO CADENA_INTERPOLADA:
-
-                reconocer texto y expresiones admitidas
-
-                evitar interpretar las llaves internas
-                como delimitadores de bloques externos
-
-                SI termina el literal
-                    estado ← CODIGO
-                FIN SI
-
-            CASO CARACTER:
-
-                reconocer escapes y cierre válido
-
-                SI termina el literal
-                    estado ← CODIGO
-                FIN SI
-
-        FIN SEGÚN
-
-        avanzar posición según elemento consumido
-
-    FIN MIENTRAS
-
-    SI existen literales, bloques o instrucciones incompletos
+    SI quedan delimitadores o bloques sin cerrar
         GENERAR error de análisis
     FIN SI
 
@@ -407,15 +371,27 @@ FUNCIÓN IdentificarPartes(unidades)
 
     PARA CADA unidad EN unidades
 
-        SI unidad declara una clase
+        SI unidad declara espacio de nombres
+
+            SI unidad.EsContabilizable
+                incrementar LOC externas
+            FIN SI
+
+            SI termina con ';'
+                registrar namespace de ámbito de archivo
+            SI NO
+                registrar namespace pendiente de apertura
+            FIN SI
+
+        SI NO, SI unidad declara una clase o enumeración
 
             parte ← nueva ResultadoParte
 
-            parte.Nombre ← nombre calificado de la clase
+            parte.Nombre ← nombre calificado (namespaces + clase contenedora + nombre)
 
             agregar parte al resultado
 
-            registrar clase pendiente de apertura
+            registrar parte pendiente de apertura (indicando si es enumeración)
 
             SI unidad.EsContabilizable
                 parte.AgregarLOC()
@@ -423,30 +399,29 @@ FUNCIÓN IdentificarPartes(unidades)
 
         SI NO, SI unidad abre un bloque
 
-            registrar tipo de bloque en pilaBloques
-
-            SI corresponde a una clase pendiente
-
-                incorporar clase a pilaClases
-
+            SI corresponde a parte pendiente
+                incorporar parte a pilaClases y registrar Parte o Enumeracion en pilaBloques
+            SI NO, SI corresponde a namespace pendiente
+                incorporar namespace a pilaNamespaces y registrar Namespace en pilaBloques
+            SI NO
+                registrar Otro en pilaBloques
             FIN SI
 
         SI NO, SI unidad cierra un bloque
 
             bloque ← retirar elemento de pilaBloques
 
-            SI bloque corresponde a una clase
-
+            SI bloque es Parte o Enumeracion
                 retirar clase de pilaClases
-
+            SI NO, SI bloque es Namespace
+                retirar namespace de pilaNamespaces
             FIN SI
 
         SI NO
 
-            SI unidad declara método o constructor
+            SI unidad declara método o constructor Y bloque actual es Parte (clase directa)
 
-                incrementar contador de métodos
-                de la clase activa
+                incrementar contador de métodos de la clase activa
 
             FIN SI
 

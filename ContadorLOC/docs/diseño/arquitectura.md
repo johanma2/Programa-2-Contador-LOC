@@ -57,7 +57,7 @@ Los archivos se implementarán durante la fase de Código.
 2. Solicitar el análisis a AnalizadorCodigo.
 3. Validar la ruta.
 4. Localizar los archivos C#.
-5. Excluir directorios bin y obj.
+5. Excluir directorios bin y obj (en rutas directas y búsqueda recursiva).
 6. Leer cada archivo.
 7. Reconocer comentarios, literales y delimitadores.
 8. Generar las unidades lógicas.
@@ -121,8 +121,11 @@ Las ejecuciones que no puedan completar el análisis finalizarán con código 1.
 
 Los diagramas se encuentran en:
 
+- diagrama-clases.puml
 - diagrama-arquitectura.puml
 - diagrama-flujo.puml
+
+El diagrama de clases muestra la estructura de las nueve unidades públicas y sus tipos internos.
 
 El diagrama de arquitectura representa las dependencias entre componentes.
 

@@ -140,12 +140,13 @@ No se duplicarán estas LOC en la clase contenedora.
 ### Construcciones excluidas inicialmente
 
 - Cadenas delimitadas mediante comillas triples.
-- Interpolaciones complejas o combinaciones de literales no admitidas.
-- Directivas de compilación condicional.
+- Interpolaciones complejas o combinaciones de literales no admitidas (como `$@"..."`, `@$"..."` o `$$"..."`).
+- Directivas de compilación condicional (`#if`, `#elif`, `#else`, `#endif`).
 - Clases parciales.
 - Constructores primarios.
 - Funciones locales.
-- Otras construcciones avanzadas que no sean necesarias para los Programas 1 y 2.
+- Tuplas de retorno, expresiones `switch` y expresiones `with`.
+- Atributos sobre declaraciones y otras construcciones avanzadas que no sean necesarias para los Programas 1 y 2.
 
 Las interfaces, estructuras y enumeraciones podrán incorporarse mediante una ampliación documentada del alcance cuando sean necesarias.
 
@@ -211,3 +212,4 @@ Las LOC registradas previamente en el Programa 1 no se utilizarán directamente 
 |---|---|---|
 | 1.0 | Planificación | Definición inicial del estándar. |
 | 1.1 | Diseño | Delimitación sintáctica, precisión de propiedades, clases anidadas, enumeraciones y exclusión de archivos generados. |
+| 1.1 (rev. Código) | Código | Precisión en exclusiones de alcance académico (tuplas de retorno, expresiones `switch` sin asignación, `with`, atributos, `delegate`/`event` y combinaciones `$@"`/`@$"`) manteniendo lambdas con cuerpo de bloque `=> { ... }` y exclusión directa de `bin`/`obj`. |

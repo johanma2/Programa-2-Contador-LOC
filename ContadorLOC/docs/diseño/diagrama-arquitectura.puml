@@ -1,0 +1,32 @@
+@startuml
+package "Presentación y Coordinación" {
+    [Program]
+    [ConsolaUI]
+}
+
+package "Acceso a Archivos" {
+    [LectorArchivos]
+}
+
+package "Procesamiento Léxico y Sintáctico" {
+    [AnalizadorCodigo]
+    [ContadorLOC]
+}
+
+package "Modelo de Unidades y Resultados" {
+    [UnidadLogica]
+    [TipoUnidad]
+    [ResultadoPrograma]
+    [ResultadoParte]
+}
+
+[Program] --> [ConsolaUI] : solicita ruta / muestra salida y errores
+[Program] --> [AnalizadorCodigo] : Analizar(ruta)
+[AnalizadorCodigo] --> [LectorArchivos] : ObtenerArchivos / LeerContenido
+[AnalizadorCodigo] --> [ContadorLOC] : AnalizarInstrucciones / ContarLOC
+[ContadorLOC] --> [UnidadLogica] : genera en una sola pasada
+[UnidadLogica] --> [TipoUnidad] : clasificación
+[AnalizadorCodigo] --> [ResultadoPrograma] : consolida partes y LOC externas
+[ResultadoPrograma] --> [ResultadoParte] : agrupa métricas por parte
+[ConsolaUI] --> [ResultadoPrograma] : imprime informe
+@enduml
